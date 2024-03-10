@@ -35,18 +35,28 @@ extractJson() {
 	node -e "var tmp=${json}; console.log(tmp.${key} || '')"
 }
 
+extractSecret() {
+	local url=$1
+	if [[ "$(which node)" == "" ]]; then
+		echo >&2 "node command required!"
+		echo >&2 "Install via https://nodejs.org/en/"
+		return
+	fi
+	node -e "var tmp=url.parse(\"${url}\", true); console.log(tmp.query.secret || '')"
+}
+
 doBwssh() {
 	host=$1
 	objectId=$2
 
 	# ensure login
-	local sessionId=$(bw login --raw || echo failed)
+	local sessionId=$(bw login --check --raw || echo failed)
 	if [[ "$(echo "$sessionId" | tail -1)" == "failed" ]]; then
 		if [[ "$(echo "$sessionId" | grep '^You are already logged in')" == "" ]]; then
 			echo "Login failed: $(echo "$sessionId" | head -n -1)"
 			return
 		fi
-	else
+	elif [[ ! -z "$sessionId" ]]; then
 		export BW_SESSION="$sessionId"
 	fi
 
@@ -71,6 +81,7 @@ doBwssh() {
 	else
 		local password=$(extractJson "$secret" login.password)
 		local totp=$(extractJson "$secret" login.totp)
+		local totp=$(extractSecret "$totp")
 		if [[ "$totp" != "" ]]; then
 			if [[ "$(which oathtool)" == "" ]]; then
 				echo >&2 "oathtool command required to generate totp 2fa pin"
